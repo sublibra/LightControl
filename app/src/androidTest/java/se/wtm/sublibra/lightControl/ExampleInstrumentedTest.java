@@ -20,11 +20,11 @@ import static org.junit.Assert.*;
 @RunWith(AndroidJUnit4.class)
 public class ExampleInstrumentedTest {
 
-    ServerCommunication sc = null;
+    NetworkFragment sc = null;
 
     @Before
     public void setUp() throws Exception {
-        sc = new ServerCommunication();
+        sc = new NetworkFragment();
     }
 
     @After
