@@ -3,26 +3,17 @@ package se.wtm.sublibra.lightControl;
 import android.app.Fragment;
 import android.app.FragmentManager;
 import android.content.Context;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
-import android.util.Log;
-
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.Reader;
 import java.net.HttpURLConnection;
-import java.net.SocketTimeoutException;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.List;
-
-import se.wtm.sublibra.myapplication.R;
 
 /**
  * Implementation of headless Fragment that runs an AsyncTask to fetch data from the network.
@@ -31,7 +22,6 @@ public class NetworkFragment extends Fragment {
 
     public static final String TAG = "NetworkFragment";
     private static final String URL_KEY = "UrlKey";
-
     private DownloadCallback mCallback;
     private DownloadTask mDownloadTask;
     private String mUrlString;
@@ -41,11 +31,19 @@ public class NetworkFragment extends Fragment {
      * from.
      */
     public static NetworkFragment getInstance(FragmentManager fragmentManager, String url) {
-        NetworkFragment networkFragment = new NetworkFragment();
-        Bundle args = new Bundle();
-        args.putString(URL_KEY, url);
-        networkFragment.setArguments(args);
-        fragmentManager.beginTransaction().add(networkFragment, TAG).commit();
+        // Recover NetworkFragment in case we are re-creating the Activity due to a config change.
+        // This is necessary because NetworkFragment might have a task that began running before
+        // the config change occurred and has not finished yet.
+        // The NetworkFragment is recoverable because it calls setRetainInstance(true).
+        NetworkFragment networkFragment = (NetworkFragment) fragmentManager
+                .findFragmentByTag(NetworkFragment.TAG);
+        if (networkFragment == null) {
+            networkFragment = new NetworkFragment();
+            Bundle args = new Bundle();
+            args.putString(URL_KEY, url);
+            networkFragment.setArguments(args);
+            fragmentManager.beginTransaction().add(networkFragment, TAG).commit();
+        }
         return networkFragment;
     }
 
@@ -53,6 +51,8 @@ public class NetworkFragment extends Fragment {
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         mUrlString = getArguments().getString(URL_KEY);
+        // Retain this Fragment across configuration changes in the host Activity.
+        setRetainInstance(true);
     }
 
     @Override
@@ -76,12 +76,13 @@ public class NetworkFragment extends Fragment {
         super.onDestroy();
     }
 
+
     /**
      * Start non-blocking execution of DownloadTask.
      */
     public void startDownload() {
         cancelDownload();
-        mDownloadTask = new DownloadTask();
+        mDownloadTask = new DownloadTask(mCallback);
         mDownloadTask.execute(mUrlString);
     }
 
@@ -94,113 +95,143 @@ public class NetworkFragment extends Fragment {
         }
     }
 
-    /**
-     * Parse list of all devices returned as json
-     *
-     * @param deviceData data returned from the server as json
-     * @return Array of device objects containing the device's data
+     /**
+     * Implementation of AsyncTask designed to fetch data from the network.
      */
-    protected Device[] parseDeviceList(String deviceData) throws JSONException, IOException {
-        Device[] deviceArray = null;
+    private class DownloadTask extends AsyncTask<String, Void, NetworkResult> {
 
-        Log.d(Lights.TAG, "JSON: " + deviceData);
-
-        try {
-            JSONObject jsonObj = new JSONObject(new String(deviceData));
-
-            // Check if we have a valid sensor. i.e. it contains the data node
-            if (jsonObj.has("device")) {
-                List<Device> deviceList = new ArrayList<Device>();
-                String name;
-                int id;
-                boolean dimmable = false;
-                JSONArray jsonDevice = jsonObj.getJSONArray("device");
-                for (int i = 0; i < jsonDevice.length(); i++) {
-                    JSONObject obj = jsonDevice.getJSONObject(i);
-                    name = obj.getString("name");
-                    id = obj.getInt("id");
-                    JSONObject parameter = obj.getJSONObject("parameter");
-                    if (parameter.getString("fade").equals("true")) {
-                        dimmable = true;
-                    }
-                    Device dev = new Device(name, dimmable, id);
-                    Log.d(Lights.TAG, "Device: " + dev.toString());
-                    deviceList.add(dev);
-                }
-                deviceArray = deviceList.toArray(new Device[deviceList.size()]);
-            } else {
-                Log.d(Lights.TAG, "error: " + jsonObj.getString("error"));
-            }
-        } catch (NullPointerException e) {
-            Log.d(Lights.TAG, e.getMessage());
-            throw new IOException(e);
+        DownloadTask(DownloadCallback callback) {
+            setCallback(callback);
         }
-        return deviceArray;
-    }
 
-    /**
-     * Created by jonash on 2016-12-29.
-     */ // AsyncTask <Params, progress, results>
-    private class DownloadTask extends AsyncTask<String, Void, String> {
+        void setCallback(DownloadCallback callback) {
+            mCallback = callback;
+        }
+
+         /**
+         * Cancel background network operation if we do not have network connectivity.
+         */
+        @Override
+        protected void onPreExecute() {
+            if (mCallback != null) {
+                NetworkInfo networkInfo = mCallback.getActiveNetworkInfo();
+                if (networkInfo == null || !networkInfo.isConnected() ||
+                        (networkInfo.getType() != ConnectivityManager.TYPE_WIFI
+                                && networkInfo.getType() != ConnectivityManager.TYPE_MOBILE)) {
+                    // If no connectivity, cancel task and update Callback with null data.
+                    mCallback.updateFromDownload(null);
+                    cancel(true);
+                }
+            }
+        }
 
         @Override
-        protected String doInBackground(String... urls) {
-
-            // params comes from the execute() call: params[0] is the url.
-            try {
-                return downloadUrl(urls[0]);
-            } catch (SocketTimeoutException e) {
-                Log.d(Lights.TAG, "Could not contact server. Socket timeout" + e.getMessage());
-                return null;
-            } catch (IOException e) {
-                Log.d(Lights.TAG, "Unable to retrieve web page. URL may be invalid." + e.getMessage());
-                return null;
+        protected NetworkResult doInBackground(String... urls) {
+            NetworkResult result = null;
+            if (!isCancelled() && urls != null && urls.length > 0) {
+                String urlString = urls[0];
+                try {
+                    URL url = new URL(urlString);
+                    String resultString = downloadUrl(url);
+                    if (resultString != null) {
+                        result = new NetworkResult(urlString, resultString);
+                    } else {
+                        throw new IOException("No response received.");
+                    }
+                } catch(Exception e) {
+                    result = new NetworkResult(urlString, e);
+                }
             }
+            return result;
         }
 
-        protected void onPostExecute(Device[] result) {
-            if (result != null) {
-                Log.d(Lights.TAG, "Content: " + result.toString());
-            } else {
-                Log.d(Lights.TAG, "No results found");
+        /**
+         * Updates the DownloadCallback with the result.
+         */
+        @Override
+        protected void onPostExecute(NetworkResult result) {
+            if (result != null && mCallback != null) {
+                if (result.mException != null) {
+                    mCallback.updateFromDownload(result);
+                } else if (result.mResultValue != null) {
+                    mCallback.updateFromDownload(result);
+                }
+                mCallback.finishDownloading();
             }
         }
 
         /**
-         * Given a URL, establishes an HttpUrlConnection and retrieves the data as a string
-         * response limited to 5000 characters since sensor input is short
-         *
-         * @param myurl
-         * @return sensor data as string
-         * @throws IOException
-         * @throws SocketTimeoutException
+         * Given a URL, sets up a connection and gets the HTTP response body from the server.
+         * If the network request is successful, it returns the response body in String form. Otherwise,
+         * it will throw an IOException.
          */
-        private String downloadUrl(String myurl) throws IOException, SocketTimeoutException {
-            int len = 50000; // only read 5000 first chars
-            InputStream is = null;
-            Reader reader = null;
+        private String downloadUrl(URL url) throws IOException {
+            InputStream stream = null;
+            HttpURLConnection connection = null;
+            String result = null;
             try {
-                URL url = new URL(myurl);
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setReadTimeout(10000 /* milliseconds */);
-                conn.setConnectTimeout(15000 /* milliseconds */);
-                conn.setRequestMethod("GET");
-                conn.setDoInput(true);
-                conn.connect();
-                int response = conn.getResponseCode();
-                Log.d(Lights.TAG, "HTTP response is: " + response);
-                is = conn.getInputStream();
-                reader = new InputStreamReader(is, "UTF-8");
-                char[] buffer = new char[len];
-                reader.read(buffer);
-                return new String(buffer);
+                connection = (HttpURLConnection) url.openConnection();
+                // Timeout for reading InputStream arbitrarily set to 3000ms.
+                connection.setReadTimeout(3000);
+                // Timeout for connection.connect() arbitrarily set to 3000ms.
+                connection.setConnectTimeout(3000);
+                // For this use case, set HTTP method to GET.
+                connection.setRequestMethod("GET");
+                // Already true by default but setting just in case; needs to be true since this request
+                // is carrying an input (response) body.
+                connection.setDoInput(true);
+                // Open communications link (network traffic occurs here).
+                connection.connect();
+                //publishProgress(DownloadCallback.Progress.CONNECT_SUCCESS);
+                int responseCode = connection.getResponseCode();
+                if (responseCode != HttpURLConnection.HTTP_OK) {
+                    throw new IOException("HTTP error code: " + responseCode);
+                }
+                // Retrieve the response body as an InputStream.
+                stream = connection.getInputStream();
+                //publishProgress(DownloadCallback.Progress.GET_INPUT_STREAM_SUCCESS, 0);
+                if (stream != null) {
+                    // Converts Stream to String with max length of 5000.
+                    result = readStream(stream, 5000);
+                }
             } finally {
-                // Makes sure that the InputStream is closed after the app is
-                // finished using it.
-                if (is != null) {
-                    is.close();
+                // Close Stream and disconnect HTTPS connection.
+                if (stream != null) {
+                    stream.close();
+                }
+                if (connection != null) {
+                    connection.disconnect();
                 }
             }
+            return result;
+        }
+
+        /**
+         * Converts the contents of an InputStream to a String.
+         */
+        private String readStream(InputStream stream, int maxLength) throws IOException {
+            String result = null;
+            // Read InputStream using the UTF-8 charset.
+            InputStreamReader reader = new InputStreamReader(stream, "UTF-8");
+            // Create temporary buffer to hold Stream data with specified max length.
+            char[] buffer = new char[maxLength];
+            // Populate temporary buffer with Stream data.
+            int numChars = 0;
+            int readSize = 0;
+            while (numChars < maxLength && readSize != -1) {
+                numChars += readSize;
+                int pct = (100 * numChars) / maxLength;
+                //publishProgress(DownloadCallback.Progress.PROCESS_INPUT_STREAM_IN_PROGRESS, pct);
+                readSize = reader.read(buffer, numChars, buffer.length - numChars);
+            }
+            if (numChars != -1) {
+                // The stream was not empty.
+                // Create String that is actual length of response body if actual length was less than
+                // max length.
+                numChars = Math.min(numChars, maxLength);
+                result = new String(buffer, 0, numChars);
+            }
+            return result;
         }
     }
 }

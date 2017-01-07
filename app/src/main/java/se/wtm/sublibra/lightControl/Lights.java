@@ -8,15 +8,25 @@ import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
-import android.view.View;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
+import android.widget.LinearLayout;
+import android.widget.Switch;
+
+import org.json.JSONException;
+
+import java.io.IOException;
+
 import se.wtm.sublibra.myapplication.R;
 
 public class Lights extends AppCompatActivity implements DownloadCallback{
 
     public static final String TAG = "LightControl";
-    final String deviceURL = "http://sublibra.wtm.se:666/json/devices/list?key=&supportedMethods=";
+    final String deviceListURL = "";
+    final String deviceURL = ""; 
+
 
     // Keep a reference to the NetworkFragment, which owns the AsyncTask object
     // that is used to execute network ops.
@@ -33,16 +43,18 @@ public class Lights extends AppCompatActivity implements DownloadCallback{
         setContentView(R.layout.activity_lights);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
+        NetworkFragment sc = new NetworkFragment();
+        mNetworkFragment = NetworkFragment.getInstance(getFragmentManager(), deviceListURL);
 
         FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                NetworkFragment sc = new NetworkFragment();
-                //sc.execute(deviceURL);
-
-                //Device[] devs = sc.doInBackground(deviceURL);
-
+                if (!mDownloading && mNetworkFragment != null) {
+                    // Execute the async download.
+                    mNetworkFragment.startDownload();
+                    mDownloading = true;
+                }
                 Snackbar.make(view, "SDFGSDFG", Snackbar.LENGTH_LONG)
                        .setAction("Action", null).show();
             }
@@ -70,9 +82,49 @@ public class Lights extends AppCompatActivity implements DownloadCallback{
         return super.onOptionsItemSelected(item);
     }
 
-    @Override
-    public void updateFromDownload(Object result) {
+    public void addAvailableControllers(final DeviceList deviceList){
+        LinearLayout linearLayout = (LinearLayout) findViewById(R.id.controls);
+        linearLayout.removeAllViews();
 
+        for (Device device : deviceList.getDevices() ){
+            Switch devSwitch = new Switch(this);
+            devSwitch.setText(device.getDeviceName());
+            devSwitch.setId(device.getId());
+            devSwitch.setChecked(device.isOn());
+            linearLayout.addView(devSwitch);
+            devSwitch.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    Snackbar.make(view, "Toggling " + view.getId(),  Snackbar.LENGTH_LONG)
+                            .setAction("Action", null).show();
+                    mNetworkFragment = NetworkFragment.getInstance(getFragmentManager(), deviceURL + view.getId());
+                    if (!mDownloading && mNetworkFragment != null) {
+                        mNetworkFragment.startDownload();
+                        mDownloading = true;
+                        Log.d(Lights.TAG, deviceURL + view.getId());
+                    }
+                }
+            });
+        }
+    }
+
+    @Override
+    public void updateFromDownload(Object netResult) {
+        NetworkResult result = (NetworkResult) netResult;
+        try {
+            if (result.getCommand().equals(deviceListURL)) {
+                DeviceList deviceList = new DeviceList(result.getResultValue());
+                addAvailableControllers(deviceList);
+                Log.d(Lights.TAG, deviceList.toString());
+            } else {
+                Log.d(Lights.TAG, result.getCommand() + ":" + result.getResultValue());
+            }
+
+        } catch (JSONException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        };
     }
 
     @Override
