@@ -10,7 +10,7 @@ import org.junit.runner.RunWith;
 
 import java.io.IOException;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertArrayEquals;
 
 /**
  * Instrumentation test, which will execute on an Android device.
@@ -18,18 +18,18 @@ import static org.junit.Assert.*;
  * @see <a href="http://d.android.com/tools/testing">Testing documentation</a>
  */
 @RunWith(AndroidJUnit4.class)
-public class ExampleInstrumentedTest {
+public class LightInstrumentationTest {
 
-    NetworkFragment sc = null;
+    DeviceList deviceList = null;
 
     @Before
     public void setUp() throws Exception {
-        sc = new NetworkFragment();
+        deviceList = new DeviceList();
     }
 
     @After
     public void tearDown() throws Exception {
-        sc = null;
+        deviceList = null;
     }
 
     @Test
@@ -83,7 +83,7 @@ public class ExampleInstrumentedTest {
         Device dev1 = new Device("Dev1", false, 1);
         Device dev2 = new Device("Dev2", true, 2);
         Device[] testDevArray = {dev1, dev2};
-        Device[] retDevArray = sc.parseDeviceList(devListJson);
+        Device[] retDevArray = deviceList.parseDeviceList(devListJson);
         assertArrayEquals(retDevArray, testDevArray);
     }
 
@@ -115,7 +115,7 @@ public class ExampleInstrumentedTest {
 
 
         // should throw JSONexception
-        sc.parseDeviceList(brokenJSON);
+        deviceList.parseDeviceList(brokenJSON);
     }
 
     @Test(expected = JSONException.class)
@@ -148,12 +148,12 @@ public class ExampleInstrumentedTest {
                         "   }" +
                         "   ]" +
                         "}";
-        sc.parseDeviceList(noStartNode);
+        deviceList.parseDeviceList(noStartNode);
     }
 
     @Test(expected = IOException.class)
     public void testNullInput() throws Exception {
-        sc.parseDeviceList(null);
-        sc.parseDeviceList("");
+        deviceList.parseDeviceList(null);
+        deviceList.parseDeviceList("");
     }
 }
