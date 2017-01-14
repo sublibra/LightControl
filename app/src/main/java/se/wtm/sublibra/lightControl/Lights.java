@@ -7,7 +7,6 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
-import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
@@ -25,18 +24,18 @@ import java.io.IOException;
 
 import se.wtm.sublibra.myapplication.R;
 
-public class Lights extends AppCompatActivity implements DownloadCallback{
+public class Lights extends AppCompatActivity implements DownloadCallback {
 
     public static final String TAG = "LightControl";
     String deviceListURL;
     String deviceURL;
 
-    private void retrieveURLFromSettings(){
+    private void retrieveURLFromSettings() {
         SharedPreferences sharedPrefs = PreferenceManager
                 .getDefaultSharedPreferences(this);
         String baseURL = sharedPrefs.getString("base_url", "NULL");
         String port = sharedPrefs.getString("port", "");
-        if (!port.isEmpty()){
+        if (!port.isEmpty()) {
             port = ":" + port;
         }
         // Ending based on tellprox REST interface
@@ -45,7 +44,7 @@ public class Lights extends AppCompatActivity implements DownloadCallback{
 
     }
 
-    private void retrieveDeviceListFromNetwork(View view) {
+    private void retrieveDeviceListFromNetwork() {
         String message;
         if (deviceListURL == null || !URLUtil.isValidUrl(deviceListURL)) {
             message = "Please set valid base URL setting in settings before updating";
@@ -54,7 +53,7 @@ public class Lights extends AppCompatActivity implements DownloadCallback{
             dt.execute(deviceListURL);
             message = "Update light control list";
         }
-        Snackbar.make(view, message, Snackbar.LENGTH_LONG)
+        Snackbar.make(findViewById(R.id.app_bar), message, Snackbar.LENGTH_LONG)
                 .setAction("Action", null).show();
     }
 
@@ -64,15 +63,12 @@ public class Lights extends AppCompatActivity implements DownloadCallback{
         setContentView(R.layout.activity_lights);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
+
         // Get base url from settings
         retrieveURLFromSettings();
-        FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
-        fab.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                retrieveDeviceListFromNetwork(view);
-            }
-        });
+
+        // Do initial update
+        retrieveDeviceListFromNetwork();
     }
 
     @Override
@@ -88,6 +84,9 @@ public class Lights extends AppCompatActivity implements DownloadCallback{
             case R.id.action_settings:
                 openSettings();
                 return true;
+            case R.id.action_update_ligts:
+                retrieveDeviceListFromNetwork();
+                return true;
             default:
                 return super.onOptionsItemSelected(item);
         }
@@ -98,55 +97,69 @@ public class Lights extends AppCompatActivity implements DownloadCallback{
         startActivity(intent);
     }
 
-    public void addAvailableControllers(final DeviceList deviceList){
-        LinearLayout linearLayout = (LinearLayout) findViewById(R.id.controls);
-        linearLayout.removeAllViews();
+    public void addAvailableControllers(final DeviceList deviceList) {
+        if (deviceList.getLength() != 0) {
 
-        for (Device device : deviceList.getDevices() ){
-            final Switch devSwitch = new Switch(this);
-            devSwitch.setText(device.getDeviceName());
-            devSwitch.setId(device.getId());
-            devSwitch.setChecked(device.isOn());
-            linearLayout.addView(devSwitch);
-            devSwitch.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    Snackbar.make(view, "Toggling " + devSwitch.getText(), Snackbar.LENGTH_LONG)
-                            .setAction("Action", null).show();
-                    DownloadTask dt = new DownloadTask(Lights.this);
-                    dt.execute(deviceURL + view.getId());
-                    Log.d(Lights.TAG, deviceURL + view.getId());
-                }
-            });
+            LinearLayout linearLayout = (LinearLayout) findViewById(R.id.controls);
+            linearLayout.removeAllViews();
+
+            for (Device device : deviceList.getDevices()) {
+                final Switch devSwitch = new Switch(this);
+                devSwitch.setText(device.getDeviceName());
+                devSwitch.setId(device.getId());
+                devSwitch.setChecked(device.isOn());
+                devSwitch.setTextSize(24);
+                devSwitch.setPadding(0, 0, 0, 20);
+                linearLayout.addView(devSwitch);
+                devSwitch.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                        Snackbar.make(view, "Toggling " + devSwitch.getText(), Snackbar.LENGTH_LONG)
+                                .setAction("Action", null).show();
+                        DownloadTask dt = new DownloadTask(Lights.this);
+                        dt.execute(deviceURL + view.getId());
+                        Log.d(Lights.TAG, deviceURL + view.getId());
+                    }
+                });
+            }
+        } else {
+            snackBarMessage("Error - could not find any devices");
         }
+
     }
 
+    private void snackBarMessage(String message) {
+        Snackbar.make(findViewById(R.id.app_bar), message,
+                Snackbar.LENGTH_LONG)
+                .setAction("Action", null).show();
+    }
 
     /**
      * Update view based on what has been received from the network call
+     *
      * @param netResult NetworkResult object containing command, result or an exception
      */
     @Override
     public void updateFromDownload(Object netResult) {
         NetworkResult result = (NetworkResult) netResult;
         try {
-            if (result.getException()!=null || result.getResultValue() == null){
+            if (result.getException() != null || result.getResultValue() == null) {
+                snackBarMessage("Server communication fail. Check base URL: " + deviceListURL);
                 Log.d(Lights.TAG, "Server communication fail: " + result.getException());
             } else if (result.getCommand().equals(deviceListURL)) {
                 Log.d(Lights.TAG, result.getCommand() + ":" + result.getResultValue());
                 DeviceList deviceList = new DeviceList(result.getResultValue());
                 addAvailableControllers(deviceList);
                 Log.d(Lights.TAG, deviceList.toString());
-            } else if (result.getCommand().contains(deviceURL)){
+            } else if (result.getCommand().contains(deviceURL)) {
                 // The command was a code switch.
                 Log.d(Lights.TAG, result.getCommand() + ":" + result.getResultValue());
             } else {
                 Log.d(Lights.TAG, "Unknown command received: " + result.getCommand());
             }
-        } catch (JSONException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
+        } catch (JSONException|IOException e) {
+            snackBarMessage("Server communication fail" );
+            Log.d(Lights.TAG, "Server communication fail: " + e.getMessage());
         }
     }
 

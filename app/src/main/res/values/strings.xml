@@ -9,5 +9,6 @@
     <string name="pref_base_url">Tellprox base URL</string>
     <string name="pref_default_port">666</string>
     <string name="pref_base_port">Tellprox port</string>
+    <string name="action_update_lights">Update switches</string>
 
 </resources>
