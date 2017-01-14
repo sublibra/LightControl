@@ -58,6 +58,7 @@ public class DeviceList {
                 List<Device> deviceList = new ArrayList<Device>();
                 String name;
                 int id;
+                int dimValue;
                 boolean isOn;
                 boolean dimmable = false;
                 JSONArray jsonDevice = jsonObj.getJSONArray("device");
@@ -66,11 +67,10 @@ public class DeviceList {
                     name = obj.getString("name");
                     id = obj.getInt("id");
                     isOn = obj.getInt("state") == 1;
+                    dimValue = obj.getInt("statevalue");
                     JSONObject parameter = obj.getJSONObject("parameter");
-                    if (parameter.getString("fade").equals("true")) {
-                        dimmable = true;
-                    }
-                    Device dev = new Device(name, dimmable, id);
+                    dimmable = parameter.getString("fade").equals("true");
+                    Device dev = new Device(name, dimmable, dimValue, id);
                     dev.setOn(isOn);
                     deviceList.add(dev);
                 }

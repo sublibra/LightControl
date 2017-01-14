@@ -80,9 +80,85 @@ public class LightInstrumentationTest {
                         "}";
 
 
-        Device dev1 = new Device("Dev1", false, 1);
-        Device dev2 = new Device("Dev2", true, 2);
+        Device dev1 = new Device("Dev1", false, 0,  1);
+        Device dev2 = new Device("Dev2", true, 0, 2);
         Device[] testDevArray = {dev1, dev2};
+        Device[] retDevArray = deviceList.parseDeviceList(devListJson);
+        assertArrayEquals(retDevArray, testDevArray);
+    }
+
+
+    @Test
+    public void testParseDeviceListMultipleNodes() throws Exception {
+
+        String devListJson =
+                "{" +
+                        "    \"device\": [" +
+                        "    {" +
+                        "        \"statevalue\": \"0\"," +
+                        "           \"name\": \"Dev1\"," +
+                        "           \"parameter\": {"+
+                        "               \"fade\": \"false\","+
+                        "               \"house\": \"14032890\","+
+                        "               \"code\": \"0000000000\","+
+                        "               \"system\": \"1\","+
+                        "               \"unit\": \"16\""+
+                        "           },"+
+                        "           \"editable\": 1," +
+                        "           \"state\": 2," +
+                        "           \"client\": 1," +
+                        "           \"online\": 1," +
+                        "           \"type\": \"device\"," +
+                        "           \"id\": 1," +
+                        "           \"clientName\": \"TellProx\"," +
+                        "           \"methods\": 0" +
+                        "   }," +
+                        "   {" +
+                        "       \"statevalue\": \"0\"," +
+                        "           \"name\": \"Dev3\"," +
+                        "           \"parameter\": {"+
+                        "               \"fade\": \"false\","+
+                        "               \"house\": \"14032890\","+
+                        "               \"code\": \"0000000000\","+
+                        "               \"system\": \"1\","+
+                        "               \"unit\": \"16\""+
+                        "           },"+
+                        "           \"editable\": 1," +
+                        "           \"state\": 2," +
+                        "           \"client\": 1," +
+                        "           \"online\": 1," +
+                        "           \"type\": \"device\"," +
+                        "           \"id\": 9," +
+                        "           \"clientName\": \"TellProx\"," +
+                        "           \"methods\": 0" +
+                        "   }," +
+                        "   {" +
+                        "       \"statevalue\": \"100\"," +
+                        "           \"name\": \"Dev2\"," +
+                        "           \"parameter\": {"+
+                        "               \"fade\": \"true\","+
+                        "               \"house\": \"14032890\","+
+                        "               \"code\": \"0000000000\","+
+                        "               \"system\": \"1\","+
+                        "               \"unit\": \"16\""+
+                        "           },"+
+                        "           \"editable\": 1," +
+                        "           \"state\": 2," +
+                        "           \"client\": 1," +
+                        "           \"online\": 1," +
+                        "           \"type\": \"device\"," +
+                        "           \"id\": 2," +
+                        "           \"clientName\": \"TellProx\"," +
+                        "           \"methods\": 0" +
+                        "   }" +
+                        "   ]" +
+                        "}";
+
+
+        Device dev1 = new Device("Dev1", false, 0, 1);
+        Device dev2 = new Device("Dev2", true, 100, 2);
+        Device dev3 = new Device("Dev3", false, 0, 9);
+        Device[] testDevArray = {dev1, dev3, dev2};
         Device[] retDevArray = deviceList.parseDeviceList(devListJson);
         assertArrayEquals(retDevArray, testDevArray);
     }
