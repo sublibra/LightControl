@@ -13,9 +13,9 @@ import java.net.URL;
 /**
  * Implementation of AsyncTask designed to fetch data from the network.
  */
-public class DownloadTask extends AsyncTask<String, Void, NetworkResult> {
+public class DownloadTask extends AsyncTask<ServerRequest, Void, ServerRequest> {
 
-    private DownloadCallback<NetworkResult> mCallback;
+    private DownloadCallback<ServerRequest> mCallback;
 
     public DownloadTask(DownloadCallback callback) {
         setCallback(callback);
@@ -43,20 +43,20 @@ public class DownloadTask extends AsyncTask<String, Void, NetworkResult> {
     }
 
     @Override
-    protected NetworkResult doInBackground(String... urls) {
-        NetworkResult result = null;
-        if (!isCancelled() && urls != null && urls.length > 0) {
-            String urlString = urls[0];
+    protected ServerRequest doInBackground(ServerRequest... requests) {
+        ServerRequest result = null;
+        if (!isCancelled() && requests != null && requests.length > 0) {
+            String urlString = requests[0].getRequestURL();
             try {
                 URL url = new URL(urlString);
                 String resultString = downloadUrl(url);
                 if (resultString != null) {
-                    result = new NetworkResult(urlString, resultString);
+                    result = new ServerRequest(requests[0].getCommand(), urlString, resultString);
                 } else {
                     throw new IOException("No response received.");
                 }
             } catch(Exception e) {
-                result = new NetworkResult(urlString, e);
+                result = new ServerRequest(requests[0].getCommand(), urlString, e);
             }
         }
         return result;
@@ -66,7 +66,7 @@ public class DownloadTask extends AsyncTask<String, Void, NetworkResult> {
      * Updates the DownloadCallback with the result.
      */
     @Override
-    protected void onPostExecute(NetworkResult result) {
+    protected void onPostExecute(ServerRequest result) {
         if (result != null && mCallback != null) {
             if (result.mException != null) {
                 mCallback.updateFromDownload(result);
