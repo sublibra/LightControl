@@ -27,6 +27,14 @@ public class DeviceList {
         devices = parseDeviceList(deviceData);
     }
 
+    public int getLength(){
+      if (devices == null){
+          return 0;
+      } else {
+          return devices.length;
+      }
+    }
+
     public Device[] getDevices() {
         return devices;
     }
