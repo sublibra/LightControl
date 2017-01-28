@@ -15,7 +15,17 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:id="@+id/controls"
-        android:elevation="7dp"></LinearLayout>
+        android:elevation="7dp">
+
+        <TextView
+            android:text="TextView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:id="@+id/textView2" />
+
+    </LinearLayout>
+
+
 
 
 </android.support.v4.widget.NestedScrollView>

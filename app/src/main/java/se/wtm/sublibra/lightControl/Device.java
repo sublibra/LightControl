@@ -1,8 +1,5 @@
 package se.wtm.sublibra.lightControl;
 
-/**
- * Created by jonash on 2016-12-29.
- */
 public class Device {
     String deviceName;
     boolean isDimmable;
