@@ -13,8 +13,8 @@ import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.view.View;
 import android.webkit.URLUtil;
+import android.widget.CompoundButton;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.Switch;
@@ -31,12 +31,16 @@ public class Lights extends AppCompatActivity implements DownloadCallback {
     // TellProx API routes
     private static final String listDevicesURL = "/json/devices/list?key=&supportedMethods=1";
     private static final String switchDeviceURL = "/json/device/toggle?key=&id=";
+    private static final String offDeviceURL = "/json/device/turnoff?key=&id=";
+    private static final String onDeviceURL = "/json/device/turnon?key=&id=";
     private static final String dimDeviceURL = "/json/device/dim?key=&id=%1$d&level=%2$d"; // Require String.format to add id and dim value
 
     public static final String TAG = "LightControl";
     private String deviceListURL;
     private String deviceURL;
     private String dimURL;
+    private String offURL;
+    private String onURL;
 
     private void retrieveURLFromSettings() {
         SharedPreferences sharedPrefs = PreferenceManager
@@ -50,6 +54,8 @@ public class Lights extends AppCompatActivity implements DownloadCallback {
         deviceURL = baseURL + port + switchDeviceURL;
         deviceListURL = baseURL + port + listDevicesURL;
         dimURL = baseURL + port + dimDeviceURL;
+        offURL = baseURL + port + offDeviceURL;
+        onURL = baseURL + port + onDeviceURL;
     }
 
     private void retrieveDeviceListFromNetwork() {
@@ -111,6 +117,7 @@ public class Lights extends AppCompatActivity implements DownloadCallback {
         tw.setText(device.getDeviceName());
         tw.setTextSize(24);
         linearLayout.addView(tw);
+
         final SeekBar seekBar = new SeekBar(this);
         seekBar.setMax(255);
         seekBar.setProgress(device.dimLevel);
@@ -127,9 +134,16 @@ public class Lights extends AppCompatActivity implements DownloadCallback {
                 Snackbar.make(seekBar, "Setting dim level to: " + percentageProgress + "%", Snackbar.LENGTH_LONG)
                         .setAction("Action", null).show();
                 DownloadTask dt = new DownloadTask(Lights.this);
-                dt.execute(new ServerRequest(ServerRequest.DIM,
-                        String.format(dimURL, seekBar.getId(), progresValue)));
-                Log.d(Lights.TAG, deviceURL + seekBar.getId());
+
+                if (progresValue<11){
+                    dt.execute(new ServerRequest(ServerRequest.TOGGLE, offURL + seekBar.getId()));
+                    Log.d(Lights.TAG, offURL + seekBar.getId());
+                } else {
+                    dt.execute(new ServerRequest(ServerRequest.DIM,
+                            String.format(dimURL, seekBar.getId(), progresValue)));
+                    Log.d(Lights.TAG, deviceURL + seekBar.getId());
+                }
+
             }
 
             @Override
@@ -152,14 +166,16 @@ public class Lights extends AppCompatActivity implements DownloadCallback {
         devSwitch.setTextSize(24);
         devSwitch.setPadding(0, 0, 0, 20);
         linearLayout.addView(devSwitch);
-        devSwitch.setOnClickListener(new View.OnClickListener() {
+        devSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
-            public void onClick(View view) {
-                Snackbar.make(view, "Toggling " + devSwitch.getText(), Snackbar.LENGTH_LONG)
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                String cmd;
+                cmd = (isChecked) ? onURL: offURL;
+                Snackbar.make(buttonView, "Toggling " + devSwitch.getText(), Snackbar.LENGTH_LONG)
                         .setAction("Action", null).show();
                 DownloadTask dt = new DownloadTask(Lights.this);
-                dt.execute(new ServerRequest(ServerRequest.TOGGLE, deviceURL + view.getId()));
-                Log.d(Lights.TAG, deviceURL + view.getId());
+                dt.execute(new ServerRequest(ServerRequest.TOGGLE, cmd + buttonView.getId()));
+                Log.d(Lights.TAG, cmd + buttonView.getId());
             }
         });
     }
