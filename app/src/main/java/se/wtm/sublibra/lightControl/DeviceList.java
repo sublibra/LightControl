@@ -67,7 +67,7 @@ public class DeviceList {
                     name = obj.getString("name");
                     id = obj.getInt("id");
                     isOn = obj.getInt("state") == 1;
-                    dimValue = obj.getInt("statevalue");
+                    dimValue = obj.getString("statevalue").equals("") ? 0 : obj.getInt("statevalue");
                     JSONObject parameter = obj.getJSONObject("parameter");
                     dimmable = parameter.getString("fade").equals("true");
                     Device dev = new Device(name, dimmable, dimValue, id);
