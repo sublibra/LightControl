@@ -135,7 +135,7 @@ public class Lights extends AppCompatActivity implements DownloadCallback {
                         .setAction("Action", null).show();
                 DownloadTask dt = new DownloadTask(Lights.this);
 
-                if (progresValue<11){
+                if (percentageProgress<=10){
                     dt.execute(new ServerRequest(ServerRequest.TOGGLE, offURL + seekBar.getId()));
                     Log.d(Lights.TAG, offURL + seekBar.getId());
                 } else {
