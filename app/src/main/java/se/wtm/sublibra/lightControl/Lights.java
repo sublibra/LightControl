@@ -125,24 +125,24 @@ public class Lights extends AppCompatActivity implements DownloadCallback {
         seekBar.setId(device.getId());
         linearLayout.addView(seekBar);
         seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            int progress = 0;
 
             @Override
             public void onProgressChanged(SeekBar seekBar, int progresValue, boolean fromUser) {
-                progress = progresValue;
                 int percentageProgress = progresValue * 100 / seekBar.getMax();
-                Snackbar.make(seekBar, "Setting dim level to: " + percentageProgress + "%", Snackbar.LENGTH_LONG)
-                        .setAction("Action", null).show();
                 DownloadTask dt = new DownloadTask(Lights.this);
 
-                if (progresValue<11){
+                if (percentageProgress<=10){
                     dt.execute(new ServerRequest(ServerRequest.TOGGLE, offURL + seekBar.getId()));
+                    seekBar.setProgress(0);
+                    percentageProgress = 0;
                     Log.d(Lights.TAG, offURL + seekBar.getId());
                 } else {
                     dt.execute(new ServerRequest(ServerRequest.DIM,
                             String.format(dimURL, seekBar.getId(), progresValue)));
                     Log.d(Lights.TAG, deviceURL + seekBar.getId());
                 }
+                Snackbar.make(seekBar, "Setting dim level to: " + percentageProgress + "%", Snackbar.LENGTH_LONG)
+                        .setAction("Action", null).show();
 
             }
 
